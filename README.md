@@ -1,4 +1,4 @@
-#CI-CD Analysis
+CI-CD Analysis
 
 
 Once Dockerfile has started, the script contained allows filtering commit by file name or file extension, creating a CSV 
