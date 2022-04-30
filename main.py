@@ -26,7 +26,6 @@ def clean_directory(dir_path):
 
 
 def repo_analysis(csv_name):
-
     df = pd.read_csv(csv_name)
 
     # get repo name from csv file in Repo_Name column
@@ -50,26 +49,28 @@ def repo_analysis(csv_name):
         # else check if inside the file with .yml extension a string in list_inf is contained
         # if one of those cases is true, add file name inside the yml_files
 
-        for file_name in os.listdir(saved_repo_path):
-            for check in list_inf:
-                if file_name.endswith('.yml') and re.search(check, file_name.lower()):
+        for root, dirnames, filenames in os.walk(saved_repo_path):
 
-                    yml_files.append(file_name)
+            for file_name in filenames:
+                new_root = os.path.join(root, file_name).replace(repos_dir, '').replace(repo.split('/')[1], '').replace('//','')
+                for check in list_inf:
+                    if file_name.endswith('.yml') and re.search(check, file_name.lower()):
+                        yml_files.append(new_root)
 
-                elif file_name.endswith('.yml'):
+                    elif file_name.endswith('.yml'):
+                        with open(os.path.join(root, file_name)) as f:
 
-                    with open(saved_repo_path + '/' + file_name) as f:
+                            if re.search(check, f.read()):
+                                yml_files.append(new_root)
 
-                        if re.search(check, f.read()):
-                            yml_files.append(file_name)
-
-        log.info(f'YML files found: {yml_files}')
+        log.info(f'File added ---> {yml_files}')
 
         # check if yml_files is not empty
 
+        mod_commits = list()
+
         if yml_files:
 
-            mod_commits = list()
             for yml_file in yml_files:
 
                 # execute RepositoryMining only on the yml_file contained in yml_files
@@ -86,7 +87,7 @@ def repo_analysis(csv_name):
                             'Commit Message': commit.msg
                         })
 
-            # save csv for each repository analyzed.
+                # save csv for each repository analyzed.
 
             commits_data = pd.DataFrame(mod_commits)
             repo_name = repo.replace('/', '_')
@@ -95,9 +96,9 @@ def repo_analysis(csv_name):
 
             commits_data.to_csv(csv_location_path, sep=',', encoding='utf-8')
 
-            list().clear()
+            mod_commits.clear()
 
-        log.info(f'Analysis on {repo} is ended...')
+            log.info(f'Analysis on {repo} is ended...')
 
 
 if __name__ == '__main__':
