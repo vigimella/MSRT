@@ -98,7 +98,10 @@ def repo_analysis(csv_name):
 
             mod_commits.clear()
 
-            log.info(f'Analysis on {repo} is ended...')
+        log.info(f'Deleting {repo}...')
+        shutil.rmtree(saved_repo_path)
+
+        log.info(f'Analysis on {repo} is ended...')
 
 
 if __name__ == '__main__':
