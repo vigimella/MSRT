@@ -42,8 +42,8 @@ def repo_analysis(csv_name):
 
             for m in commit.modifications:
                 commits_elm.append({
-                    'Repo_name': commit.project_name,
-                    'SHA': repo_url + '/commit/' + commit.hash,
+                    'Repo_URL': repo_url,
+                    'Commit_URL': repo_url + '/commit/' + commit.hash,
                     'Commit_date': commit.committer_date,
                     'Author': commit.author.name,
                     'Modified_file': m.filename,
@@ -53,7 +53,7 @@ def repo_analysis(csv_name):
 
         # save csv for each repository analyzed.
 
-        commits_data = pd.DataFrame(commits_elm)
+        commits_data = pd.DataFrame(commits_elm).set_index('Repo_URL')
         repo_name = repo.replace('/', '_')
         csv_name = str(num) + '-commit_list-' + repo_name + '.csv'
         csv_location_path = os.path.join(repos_commit_csv, csv_name)
@@ -72,10 +72,10 @@ def save_pipeline_commits(csv_folder):
         df = pd.read_csv(path_csv_file)
         for num, row in enumerate(df['Modified_file']):
             for check in list_inf:
-                if re.search(check, str(row).lower()) or str(row).endswith('.yml'):
+                if re.search(check, str(row).lower()):
                     important_elm.append(df.loc[num])
 
-        new_commits_data = pd.DataFrame(important_elm)
+        new_commits_data = pd.DataFrame(important_elm).set_index('Repo_URL')
         new_commits_data.to_csv(os.path.join(repos_commit_csv_filtered, 'filtered-' + csv), sep=',', encoding='utf-8')
         important_elm.clear()
 
