@@ -3,11 +3,11 @@ import re
 from pydriller import RepositoryMining
 import pandas as pd
 import logging as log
-import os, git, shutil
+import os, shutil
 
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
-repos_dir = os.path.join(APP_ROOT, 'repos_dir')
 repos_commit_csv = os.path.join(APP_ROOT, 'repos_commit_csv')
+repos_commit_csv_filtered = os.path.join(APP_ROOT, 'repos_commit_csv_filtered')
 
 log.basicConfig(level=log.INFO,
                 format='%(asctime)s :: proc_id %(process)s :: %(funcName)s :: %(levelname)s :: %(message)s')
@@ -32,98 +32,79 @@ def repo_analysis(csv_name):
 
     for num, repo in enumerate(df['Repo_Name']):
 
-        log.info(f'Cloning {repo} ({int(num) + 1} of {df["Repo_Name"].count()}) ...')
+        commits_elm = list()
+
+        log.info(f'Mining {repo} (Repo n. {int(num) + 1} of {df["Repo_Name"].count()}) ...')
 
         repo_url = 'https://github.com/' + repo
-        repos_list.append(repo_url)
 
-        # Clone repo in local storage
+        for commit in RepositoryMining(repo_url).traverse_commits():
 
-        git.Git(repos_dir).clone(repo_url)
+            for m in commit.modifications:
+                commits_elm.append({
+                    'Repo_name': commit.project_name,
+                    'SHA': repo_url + '/commit/' + commit.hash,
+                    'Commit_date': commit.committer_date,
+                    'Author': commit.author.name,
+                    'Modified_file': m.filename,
+                    'Change_type': m.change_type.name,
+                    'Commit Message': commit.msg
+                })
 
-        saved_repo_path = repos_dir + "/" + repo.split('/')[-1]
+        # save csv for each repository analyzed.
 
-        yml_files = list()
+        commits_data = pd.DataFrame(commits_elm)
+        repo_name = repo.replace('/', '_')
+        csv_name = str(num) + '-commit_list-' + repo_name + '.csv'
+        csv_location_path = os.path.join(repos_commit_csv, csv_name)
 
-        # Check if in repo exists a file with .yml extension and with the name contained in list_inf
-        # else check if inside the file with .yml extension a string in list_inf is contained
-        # if one of those cases is true, add file name inside the yml_files
+        commits_data.to_csv(csv_location_path, sep=',', encoding='utf-8')
 
-        for root, dirnames, filenames in os.walk(saved_repo_path):
 
-            for file_name in filenames:
-                new_root = os.path.join(root, file_name).replace(repos_dir, '').replace(repo.split('/')[1], '').replace('//','')
-                for check in list_inf:
-                    if file_name.endswith('.yml') and re.search(check, file_name.lower()):
-                        yml_files.append(new_root)
+def save_pipeline_commits(csv_folder):
 
-                    elif file_name.endswith('.yml'):
-                        with open(os.path.join(root, file_name)) as f:
+    important_elm = list()
 
-                            if re.search(check, f.read()):
-                                yml_files.append(new_root)
+    for csv in os.listdir(csv_folder):
 
-        log.info(f'File added ---> {yml_files}')
+        path_csv_file = os.path.join(csv_folder, csv)
 
-        # check if yml_files is not empty
+        df = pd.read_csv(path_csv_file)
+        for num, row in enumerate(df['Modified_file']):
+            for check in list_inf:
+                if re.search(check, str(row).lower()) or str(row).endswith('.yml'):
+                    important_elm.append(df.loc[num])
 
-        mod_commits = list()
-
-        if yml_files:
-
-            for yml_file in yml_files:
-
-                # execute RepositoryMining only on the yml_file contained in yml_files
-
-                for commit in RepositoryMining(repo_url, filepath=yml_file).traverse_commits():
-
-                    for m in commit.modifications:
-                        mod_commits.append({
-                            'SHA': commit.hash,
-                            'Commit_date': commit.committer_date,
-                            'Author': commit.author.name,
-                            'Modified_file': m.filename,
-                            'Change_type': m.change_type.name,
-                            'Commit Message': commit.msg
-                        })
-
-                # save csv for each repository analyzed.
-
-            commits_data = pd.DataFrame(mod_commits)
-            repo_name = repo.replace('/', '_')
-            csv_name = str(num) + '_commit_list_' + repo_name + '.csv'
-            csv_location_path = os.path.join(repos_commit_csv, csv_name)
-
-            commits_data.to_csv(csv_location_path, sep=',', encoding='utf-8')
-
-            mod_commits.clear()
-
-        log.info(f'Deleting {repo}...')
-        shutil.rmtree(saved_repo_path)
-
-        log.info(f'Analysis on {repo} is ended...')
+        new_commits_data = pd.DataFrame(important_elm)
+        new_commits_data.to_csv(os.path.join(repos_commit_csv_filtered, 'filtered-' + csv), sep=',', encoding='utf-8')
+        important_elm.clear()
 
 
 if __name__ == '__main__':
 
     repos_list = []
-    list_inf = ['circle*', 'gitlab*', 'jenkins*', 'semaphore*', 'travis*']
+    list_inf = ['circle*', 'gitlab*', 'jenkins*', 'semaphore*', 'travis*', 'appveyor*', 'wercker*', 'bamboo*']
     csv_file = 'test.csv'
 
-    if not os.path.exists(repos_dir):
-        os.makedirs(repos_dir)
-        log.info('Directory repos_dir created...')
     if not os.path.exists(repos_commit_csv):
         os.makedirs(repos_commit_csv)
         log.info('Directory repos_commit_csv created...')
 
+    if not os.path.exists(repos_commit_csv_filtered):
+        os.makedirs(repos_commit_csv_filtered)
+        log.info('Directory repos_commit_csv created...')
+
     # Cleaning directories created before
 
-    clean_directory(repos_dir)
-    log.info(f'{repos_dir} cleaned...')
     clean_directory(repos_commit_csv)
     log.info(f'{repos_commit_csv} cleaned...')
+
+    clean_directory(repos_commit_csv_filtered)
+    log.info(f'{repos_commit_csv_filtered} cleaned...')
 
     # Starting process
 
     repo_analysis(csv_file)
+    log.info('Repo analysis finished')
+    log.info('Filtering commits started')
+    save_pipeline_commits(repos_commit_csv)
