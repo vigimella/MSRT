@@ -8,7 +8,7 @@ services:
     restart: on-failure
     volumes:
       - ./repos_commit_csv/:/usr/src/app/repos_commit_csv/
-      - ./repos_dir/:/usr/src/app/repos_commit_csv_filtered/
-      - ./repos_dir/:/usr/src/app/commit_changes_dir/
+      - ./repos_commit_csv_filtered/:/usr/src/app/repos_commit_csv_filtered/
+      - ./commit_changes_dir/:/usr/src/app/commit_changes_dir/
       - ./repos_dir/:/usr/src/app/repos_dir/
 

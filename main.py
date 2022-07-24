@@ -137,7 +137,7 @@ if __name__ == '__main__':
 
     repos_list = []
     list_inf = ['circle*', 'gitlab*', 'jenkins*', 'semaphore*', 'travis*', 'appveyor*', 'wercker*', 'bamboo*']
-    csv_file = 'sort_dec.csv'
+    csv_file = 'test.csv'
 
     # Cleaning directories created before
 
