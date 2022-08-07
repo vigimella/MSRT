@@ -42,7 +42,7 @@ c.execute('DELETE FROM commit_changes;')
 
 print('Populating repository table...')
 
-with open('cl.csv', 'r') as fin:
+with open('test.csv', 'r') as fin:
     dr = csv.DictReader(fin)
     to_db = [(i['Repo_Name'], i['Language'], i['Created_At'], i['Modified_At'], i['Size'], i['Stars'], i['Forks']) for i
              in dr]
