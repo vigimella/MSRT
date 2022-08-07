@@ -1,10 +1,11 @@
-import re
-import stat
+import re, sqlite3, stat
 
 from pydriller import RepositoryMining
+
 import pandas as pd
 import logging as log
 import os, shutil
+import db_settings
 
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 repos_commit_csv = os.path.join(APP_ROOT, 'repos_commit_csv')
@@ -36,65 +37,73 @@ def repo_mining(repo_url, repo_name, num):
     try:
         for commit in RepositoryMining(repo_url, clone_repo_to=repos_dir).traverse_commits():
 
-
+                print(repo_name)
 
                 for m in commit.modifications:
                     commits_elm.append({
-                        'Repo_Name': repo_name,
-                        'Commit_URL': commit.hash,
-                        'Commit_date': commit.committer_date,
-                        'Author': commit.author.name,
-                        'Modified_file': m.filename,
-                        'Change_type': m.change_type.name,
-                        'Commit Message': commit.msg
+                        'repo_name': repo_name.replace('_', '/'),
+                        'commit_sha': commit.hash,
+                        'commit_date': commit.committer_date,
+                        'author': commit.author.name,
+                        'modified_file': m.filename,
+                        'change_type': m.change_type.name,
+                        'commit_message': commit.msg
                     })
 
                 commits_data = pd.DataFrame(commits_elm)
+                commits_data = commits_data.drop_duplicates()
                 repo_name = repo_name.replace('/', '_')
                 csv_name = str(num) + '-commit_list-' + repo_name + '.csv'
                 csv_location_path = os.path.join(repos_commit_csv, csv_name)
-
-                commits_data.to_csv(csv_location_path, sep=',', encoding='utf-8')
+                commits_data.to_csv(csv_location_path, sep=',', encoding='utf-8', index=False)
     except Exception as e:
         print(e)
         pass
 
 
-def filter_commits(folder):
+def filter_commits(folder, conn):
     important_elm = list()
     try:
         for csv in os.listdir(folder):
 
             path_csv_file = os.path.join(folder, csv)
             df = pd.read_csv(path_csv_file)
-            for num, row in enumerate(df['Modified_file']):
+            for num, row in enumerate(df['modified_file']):
                 for check in list_inf:
                     if re.search(check, str(row).lower()):
                         important_elm.append(df.loc[num])
 
             new_commits_data = pd.DataFrame(important_elm)
+
             new_commits_data.to_csv(os.path.join(repos_commit_csv_filtered, csv.replace('.csv', '-filtered.csv')),
                                     sep=',',
                                     encoding='utf-8')
             os.remove(path_csv_file)
+            new_commits_data.to_sql(name='repo_commit', con=conn, if_exists='append', index=False)
+            conn.commit()
             important_elm.clear()
+
     except Exception as e:
         print(e)
         pass
 
 
-def diff_commit(csv_filtered_folder, repo_dir, repo_name, num):
+def diff_commit(csv_filtered_folder, repo_dir, repo_name, num, conn):
     for csv in os.listdir(csv_filtered_folder):
 
         path_csv_file = os.path.join(csv_filtered_folder, csv)
         df = pd.read_csv(path_csv_file)
 
         try:
-            for file in df['Modified_file'].drop_duplicates():
+            for file in df['modified_file'].drop_duplicates():
                 cleaned_name = file.replace('.', '').replace('yml', '')
                 os.chdir(repo_dir)
                 os.system(
                     f'git log -p -- {file} >> {commit_changes_dir}/{num}-history-{repo_name.replace("/", "-")}-{cleaned_name}.txt')
+                file_url = str(commit_changes_dir) + '/' + str(num) + '-history-' + str(repo_name.replace("/", "-")) + '-' + str(cleaned_name) + '.txt'
+                c = conn.cursor()
+                c.execute('INSERT INTO commit_changes (repo_name, file_url) VALUES (?,?)', (repo_name, file_url))
+                conn.commit()
                 os.chdir(APP_ROOT)
         except Exception as e:
             print(e)
@@ -106,6 +115,9 @@ def repo_analysis(csv_name, report_path):
 
     for num, repo_name in enumerate(df['Repo_Name']):
         try:
+
+            conn = sqlite3.connect('commits.db')
+
             log.info(f'Started : {repo_name} (Repo n. {int(num) + 1} of {df["Repo_Name"].count()}) ...')
 
             repo_url = 'https://github.com/' + repo_name
@@ -113,7 +125,7 @@ def repo_analysis(csv_name, report_path):
             log.info(f'Mining {repo_name}')
             repo_mining(repo_url, repo_name, num)
             log.info(f'Filtering {repo_name}')
-            filter_commits(repos_commit_csv)
+            filter_commits(repos_commit_csv, conn)
 
             # if files contained into the list_inf are not identified goes to delete the repo, otherways goes to check
             # differences and then delete repo.
@@ -125,7 +137,7 @@ def repo_analysis(csv_name, report_path):
                 delete_repo(repo_dir)
             else:
                 log.info(f'Differences')
-                diff_commit(repos_commit_csv_filtered, repo_dir, repo_name, num)
+                diff_commit(repos_commit_csv_filtered, repo_dir, repo_name, num, conn)
                 log.info(f'Deleting {repo_name}')
                 delete_repo(repo_dir)
         except Exception as e:
