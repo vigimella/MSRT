@@ -59,8 +59,8 @@ def repo_mining(repo_url, repo_name, num):
 
             commits_data = pd.DataFrame(commits_elm)
             commits_data = commits_data.drop_duplicates()
-            repo_name = repo_name.replace('/', '_')
-            csv_name = str(num) + '-commit_list-' + repo_name + '.csv'
+            repo_name = repo_name.replace('/', '-')
+            csv_name = str(num) + '-commit-list-' + repo_name + '.csv'
             csv_location_path = os.path.join(repos_commit_csv, csv_name)
             commits_data.to_csv(csv_location_path, sep=',', encoding='utf-8', index=False)
     except Exception as e:
@@ -68,38 +68,44 @@ def repo_mining(repo_url, repo_name, num):
         pass
 
 
-def filter_commits(folder, conn):
+def filter_commits(folder, conn, repo_dir):
     important_elm = list()
-    important_msg = list()
+    github_files = list()
+
     try:
+
         for csv in os.listdir(folder):
+
+            path_gh_workflow_dir = os.path.join(repos_dir, repo_dir + '/.github/workflows')
+
+            if os.path.exists(path_gh_workflow_dir):
+                for file in os.listdir(path_gh_workflow_dir):
+                    list_inf.append(file)
+                    github_files.append(file)
 
             path_csv_file = os.path.join(folder, csv)
             df = pd.read_csv(path_csv_file)
+
             for num, row in enumerate(df['modified_file']):
                 for check in list_inf:
                     if re.search(check, str(row).lower()):
+                        important_elm.append(df.loc[num])
+            for num, row in enumerate(df['commit_message']):
+                for k_check in list_keywords:
+                    if re.search(k_check, str(row).lower()):
                         important_elm.append(df.loc[num])
 
             new_commits_data = pd.DataFrame(important_elm)
             csv_filtered_path = os.path.join(repos_commit_csv_filtered, csv.replace('.csv', '-filtered.csv'))
             new_commits_data.to_csv(csv_filtered_path, sep=',', encoding='utf-8', index=False)
 
-            important_elm.clear()
-
-            df_filtered = pd.read_csv(csv_filtered_path)
-            for num, row in enumerate(df_filtered['commit_message']):
-                for k_check in list_keywords:
-                    if re.search(k_check, str(row).lower()):
-                        important_msg.append(df_filtered.loc[num])
-
-            new_commits_data_msg = pd.DataFrame(important_msg)
-            new_commits_data_msg.to_csv(csv_filtered_path, sep=',', encoding='utf-8')
-
-            new_commits_data_msg.to_sql(name='repo_commit', con=conn, if_exists='append', index=False)
+            new_commits_data.to_sql(name='repo_commit', con=conn, if_exists='append', index=False)
             conn.commit()
 
-            important_msg.clear()
+            for elm in github_files:
+                list_inf.remove(elm)
+
+            important_elm.clear()
 
     except Exception as e:
         print(e)
@@ -114,14 +120,14 @@ def diff_commit(csv_filtered_folder, repo_dir, repo_name, num, conn):
 
         try:
             for file in df['modified_file'].drop_duplicates():
-                cleaned_name = file.replace('.', '').replace('yml', '')
+                cleaned_name = file.replace('.', '-')
                 os.chdir(repo_dir)
                 os.system(
                     f'git log -p -- {file} >> {commit_changes_dir}/{num}-history-{repo_name.replace("/", "-")}-{cleaned_name}.txt')
                 file_url = str(commit_changes_dir) + '/' + str(num) + '-history-' + str(
                     repo_name.replace("/", "-")) + '-' + str(cleaned_name) + '.txt'
                 c = conn.cursor()
-                c.execute('INSERT INTO commit_changes (repo_name, file_url) VALUES (?,?)', (repo_name, file_url))
+                c.execute('INSERT INTO commit_changes (repo_name, file_url) VALUES (?,?)', (repo_name.replace("/", "-"), file_url))
                 conn.commit()
                 os.chdir(APP_ROOT)
         except Exception as e:
@@ -144,11 +150,11 @@ def repo_analysis(csv_name, report_path):
             log.info(f'Mining {repo_name}')
             repo_mining(repo_url, repo_name, num)
             log.info(f'Filtering {repo_name}')
-            filter_commits(repos_commit_csv, conn)
+            filter_commits(repos_commit_csv, conn, repo_dir)
 
             # if files contained into the list_inf are not identified goes to delete the repo, otherways goes to check
             # differences and then delete repo.
-            csv_name = str(num) + '-commit_list-' + repo_name.replace('/', '_') + '-filtered.csv'
+            csv_name = str(num) + '-commit-list-' + repo_name.replace('/', '-') + '-filtered.csv'
             csv_path_check = os.path.join(repos_commit_csv_filtered, csv_name)
             df_filtered = pd.read_csv(csv_path_check)
             if df_filtered.empty:
@@ -165,7 +171,7 @@ def repo_analysis(csv_name, report_path):
                 remove_empty_files(repos_commit_csv_filtered)
         except Exception as e:
             print(e)
-            print(f'Error during downloading of {repo_name}. URL {"https://github.com/" + repo_name}. Type of error {e}'
+            print(f'Error --> {repo_name}. URL {"https://github.com/" + repo_name}. Type of error {e}'
                   , file=open(report_path, 'a'))
             continue
 
@@ -174,7 +180,7 @@ if __name__ == '__main__':
 
     repos_list = []
     list_inf = ['circle*', 'gitlab*', 'jenkins*', 'semaphore*', 'travis*', 'appveyor*', 'wercker*', 'bamboo*']
-    list_keywords = ['security*', 'vulnerabilities*', 'testing*', 'test*']
+    list_keywords = ['security*', 'vulnerabilities*', 'testing*', 'test*', 'ci/cd']
     csv_file = 'test.csv'
 
     report_path = os.path.join(commit_changes_dir, 'report.txt')

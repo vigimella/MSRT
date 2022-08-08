@@ -44,7 +44,7 @@ print('Populating repository table...')
 
 with open('test.csv', 'r') as fin:
     dr = csv.DictReader(fin)
-    to_db = [(i['Repo_Name'], i['Language'], i['Created_At'], i['Modified_At'], i['Size'], i['Stars'], i['Forks']) for i
+    to_db = [(i['Repo_Name'].replace("/", "-"), i['Language'], i['Created_At'], i['Modified_At'], i['Size'], i['Stars'], i['Forks']) for i
              in dr]
 
 for data in to_db:
