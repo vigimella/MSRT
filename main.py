@@ -31,7 +31,7 @@ def clean_directory(path):
 def remove_empty_files(folder):
     for file in os.listdir(folder):
         file_path = os.path.join(folder, file)
-        if os.stat(file_path).st_size == 0:
+        if os.stat(file_path).st_size == 0 or os.stat(file_path).st_size == 1:
             os.remove(file_path)
 
 
@@ -39,7 +39,7 @@ def delete_repo(repo_dir):
     shutil.rmtree(repo_dir)
 
 
-def repo_mining(repo_url, repo_name, num):
+def repo_mining(repo_url, repo_name, num, branch):
     commits_elm = list()
     try:
         for commit in RepositoryMining(repo_url, clone_repo_to=repos_dir).traverse_commits():
@@ -48,19 +48,20 @@ def repo_mining(repo_url, repo_name, num):
 
             for m in commit.modifications:
                 commits_elm.append({
-                    'repo_name': repo_name.replace('_', '/'),
+                    'repo_name': repo_name,
                     'commit_sha': commit.hash,
+                    'commit_url': 'https://github.com/' + repo_name + '/commit/' + commit.hash,
                     'commit_date': commit.committer_date,
                     'author': commit.author.name,
-                    'modified_file': m.filename,
+                    'modified_file_new_path': m.new_path,
+                    'modified_file': 'https://github.com/' + repo_name + '/blob/' + branch + '/' + m.new_path,
                     'change_type': m.change_type.name,
                     'commit_message': commit.msg
                 })
 
             commits_data = pd.DataFrame(commits_elm)
             commits_data = commits_data.drop_duplicates()
-            repo_name = repo_name.replace('/', '-')
-            csv_name = str(num) + '-commit-list-' + repo_name + '.csv'
+            csv_name = str(num) + '-commit-list-' + repo_name.replace('/', '-') + '.csv'
             csv_location_path = os.path.join(repos_commit_csv, csv_name)
             commits_data.to_csv(csv_location_path, sep=',', encoding='utf-8', index=False)
     except Exception as e:
@@ -112,35 +113,12 @@ def filter_commits(folder, conn, repo_dir):
         pass
 
 
-def diff_commit(csv_filtered_folder, repo_dir, repo_name, num, conn):
-    for csv in os.listdir(csv_filtered_folder):
-
-        path_csv_file = os.path.join(csv_filtered_folder, csv)
-        df = pd.read_csv(path_csv_file)
-
-        try:
-            for file in df['modified_file'].drop_duplicates():
-                cleaned_name = file.replace('.', '-')
-                os.chdir(repo_dir)
-                os.system(
-                    f'git log -p -- {file} >> {commit_changes_dir}/{num}-history-{repo_name.replace("/", "-")}-{cleaned_name}.txt')
-                file_url = str(commit_changes_dir) + '/' + str(num) + '-history-' + str(
-                    repo_name.replace("/", "-")) + '-' + str(cleaned_name) + '.txt'
-                c = conn.cursor()
-                c.execute('INSERT INTO commit_changes (repo_name, file_url) VALUES (?,?)', (repo_name.replace("/", "-"), file_url))
-                conn.commit()
-                os.chdir(APP_ROOT)
-        except Exception as e:
-            print(e)
-            continue
-
-
 def repo_analysis(csv_name, report_path):
     df = pd.read_csv(csv_name)
 
     for num, repo_name in enumerate(df['Repo_Name']):
         try:
-
+            default_branch = df['Default_Branch'][num]
             conn = sqlite3.connect('commits.db')
 
             log.info(f'Started : {repo_name} (Repo n. {int(num) + 1} of {df["Repo_Name"].count()}) ...')
@@ -148,7 +126,7 @@ def repo_analysis(csv_name, report_path):
             repo_url = 'https://github.com/' + repo_name
             repo_dir = os.path.join(repos_dir, repo_name.split('/')[1])
             log.info(f'Mining {repo_name}')
-            repo_mining(repo_url, repo_name, num)
+            repo_mining(repo_url, repo_name, num, default_branch)
             log.info(f'Filtering {repo_name}')
             filter_commits(repos_commit_csv, conn, repo_dir)
 
@@ -159,13 +137,11 @@ def repo_analysis(csv_name, report_path):
             df_filtered = pd.read_csv(csv_path_check)
             if df_filtered.empty:
                 log.info(f'Deleting {repo_name}')
-                delete_repo(repo_dir)
                 print(
-                    f'In repo {repo_name}. URL {"https://github.com/" + repo_name}. No keyword identified.'
+                    f'Repo {repo_name}. URL {"https://github.com/" + repo_name}. Empty.'
                     , file=open(report_path, 'a'))
+                remove_empty_files(repos_commit_csv_filtered)
             else:
-                log.info(f'Differences')
-                diff_commit(repos_commit_csv_filtered, repo_dir, repo_name, num, conn)
                 log.info(f'Deleting {repo_name}')
                 delete_repo(repo_dir)
                 remove_empty_files(repos_commit_csv_filtered)
@@ -180,10 +156,10 @@ if __name__ == '__main__':
 
     repos_list = []
     list_inf = ['circle*', 'gitlab*', 'jenkins*', 'semaphore*', 'travis*', 'appveyor*', 'wercker*', 'bamboo*']
-    list_keywords = ['security*', 'vulnerabilities*', 'testing*', 'test*', 'ci/cd']
+    list_keywords = ['security*', 'vuln*', 'testing*', 'penetration', 'scan*', 'detect', 'secre*', 'pentest*']
     csv_file = 'test.csv'
 
-    report_path = os.path.join(commit_changes_dir, 'report.txt')
+    report_path = os.path.join(APP_ROOT, 'report.txt')
 
     # Cleaning directories created before
 
@@ -195,9 +171,6 @@ if __name__ == '__main__':
 
     clean_directory(repos_dir)
     log.info(f'{repos_dir} cleaned...')
-
-    clean_directory(commit_changes_dir)
-    log.info(f'{commit_changes_dir} cleaned...')
 
     if os.path.isfile(report_path):
         os.remove(report_path)
@@ -212,10 +185,6 @@ if __name__ == '__main__':
 
     if not os.path.exists(repos_dir):
         os.makedirs(repos_dir)
-        log.info('Directory repos_commit_csv created...')
-
-    if not os.path.exists(commit_changes_dir):
-        os.makedirs(commit_changes_dir)
         log.info('Directory repos_commit_csv created...')
 
     # Starting process
