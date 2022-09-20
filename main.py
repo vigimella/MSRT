@@ -1,11 +1,16 @@
-import re, sqlite3, stat
-
-from pydriller import RepositoryMining
+import re, sqlite3, stat, os, shutil, spacy, nltk
 
 import pandas as pd
 import logging as log
-import os, shutil
 import db_settings
+
+from pydriller import RepositoryMining
+from nltk.tokenize import sent_tokenize
+from nltk.corpus import stopwords
+
+nlp = spacy.load("en_core_web_sm")
+nltk.download('punkt')  # for tokenization
+nltk.download('stopwords')
 
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 repos_commit_csv = os.path.join(APP_ROOT, 'repos_commit_csv')
@@ -15,6 +20,24 @@ commit_changes_dir = os.path.join(APP_ROOT, 'commit_changes_dir')
 
 log.basicConfig(level=log.INFO,
                 format='%(asctime)s :: proc_id %(process)s :: %(funcName)s :: %(levelname)s :: %(message)s')
+
+
+def nlp_process(repo_commit):
+    # Sentence tokenization (NLTK)
+    tokenized_sents = sent_tokenize(str(repo_commit))
+    # Word tokenization (NLTK)
+    sent = tokenized_sents[0]
+    tokens = nltk.word_tokenize(sent)
+    # Punctuation and digits removal
+    tokens = [token.lower() for token in tokens if token.isalpha()]
+
+    stop_words = set(stopwords.words("english"))
+    filtered_sent = list()
+    for w in tokens:
+        if w not in stop_words:
+            filtered_sent.append(w)
+
+
 
 
 def clean_directory(path):
@@ -92,6 +115,9 @@ def filter_commits(folder, conn, repo_dir):
                     if re.search(check, str(row).lower()):
                         important_elm.append(df.loc[num])
             for num, row in enumerate(df['commit_message']):
+
+                nlp_process(row)
+
                 for k_check in list_keywords:
                     if re.search(k_check, str(row).lower()):
                         important_elm.append(df.loc[num])
