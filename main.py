@@ -7,6 +7,8 @@ import db_settings
 from pydriller import RepositoryMining
 from nltk.tokenize import sent_tokenize
 from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+from nltk.tokenize import sent_tokenize, word_tokenize
 
 nlp = spacy.load("en_core_web_sm")
 nltk.download('punkt')  # for tokenization
@@ -23,21 +25,25 @@ log.basicConfig(level=log.INFO,
 
 
 def nlp_process(repo_commit):
-    # Sentence tokenization (NLTK)
-    tokenized_sents = sent_tokenize(str(repo_commit))
-    # Word tokenization (NLTK)
-    sent = tokenized_sents[0]
-    tokens = nltk.word_tokenize(sent)
-    # Punctuation and digits removal
+    # sentence tokenization
+    tokens = nltk.word_tokenize(repo_commit)
+    # punctuation and digits removal
     tokens = [token.lower() for token in tokens if token.isalpha()]
-
+    # stopwords
     stop_words = set(stopwords.words("english"))
-    filtered_sent = list()
+    list_filtered_sent = list()
     for w in tokens:
         if w not in stop_words:
-            filtered_sent.append(w)
+            list_filtered_sent.append(w)
 
+    ps = PorterStemmer()
+    stemmed_words = list()
+    for w in list_filtered_sent:
+        stemmed_words.append(ps.stem(w))
 
+    filtered_sent = ' '.join(stemmed_words)
+
+    return filtered_sent
 
 
 def clean_directory(path):
@@ -115,13 +121,10 @@ def filter_commits(folder, conn, repo_dir):
                     if re.search(check, str(row).lower()):
                         important_elm.append(df.loc[num])
             for num, row in enumerate(df['commit_message']):
-
-                nlp_process(row)
-
+                filtered_sentence = nlp_process(row)
                 for k_check in list_keywords:
-                    if re.search(k_check, str(row).lower()):
+                    if re.search(k_check, filtered_sentence):
                         important_elm.append(df.loc[num])
-
             new_commits_data = pd.DataFrame(important_elm)
             csv_filtered_path = os.path.join(repos_commit_csv_filtered, csv.replace('.csv', '-filtered.csv'))
             new_commits_data.to_csv(csv_filtered_path, sep=',', encoding='utf-8', index=False)
