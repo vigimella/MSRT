@@ -20,7 +20,7 @@ c.execute('''CREATE TABLE if not exists repository(
 c.execute(''' CREATE TABLE IF NOT EXISTS repo_commit(
                 id_commit integer primary key not null,
                 repo_name varchar(40) not null,
-                commit_sha varchar(250) not null,
+                commit_sha varchar(250) not null on conflict ignore,
                 commit_url varchar(400) not null,
                 commit_date varchar(30) not null,
                 author varchar(50) not null,
@@ -30,7 +30,6 @@ c.execute(''' CREATE TABLE IF NOT EXISTS repo_commit(
                 commit_message text not null,
                 FOREIGN KEY(id_commit) REFERENCES repository(id_repo)
                 )''')
-
 print('Cleaning repository, repo_commit, and commit_changes tables ...')
 
 c.execute('DELETE FROM repository;')

@@ -18,8 +18,6 @@ APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 repos_commit_csv = os.path.join(APP_ROOT, 'repos_commit_csv')
 repos_commit_csv_filtered = os.path.join(APP_ROOT, 'repos_commit_csv_filtered')
 repos_dir = os.path.join(APP_ROOT, 'repos_dir')
-commit_changes_dir = os.path.join(APP_ROOT, 'commit_changes_dir')
-
 log.basicConfig(level=log.INFO,
                 format='%(asctime)s :: proc_id %(process)s :: %(funcName)s :: %(levelname)s :: %(message)s')
 
@@ -125,9 +123,8 @@ def filter_commits(folder, conn, repo_dir):
                 for k_check in list_keywords:
                     if re.search(k_check, filtered_sentence):
                         important_elm.append(df.loc[num])
+
             new_commits_data = pd.DataFrame(important_elm)
-            csv_filtered_path = os.path.join(repos_commit_csv_filtered, csv.replace('.csv', '-filtered.csv'))
-            new_commits_data.to_csv(csv_filtered_path, sep=',', encoding='utf-8', index=False)
 
             new_commits_data.to_sql(name='repo_commit', con=conn, if_exists='append', index=False)
             conn.commit()
@@ -147,37 +144,26 @@ def repo_analysis(csv_name, report_path):
 
     for num, repo_name in enumerate(df['Repo_Name']):
         try:
+
             default_branch = df['Default_Branch'][num]
             conn = sqlite3.connect('commits.db')
 
             log.info(f'Started : {repo_name} (Repo n. {int(num) + 1} of {df["Repo_Name"].count()}) ...')
 
-            repo_url = 'https://github.com/' + repo_name
+            repo_url = 'https://test:test@github.com/' + repo_name
             repo_dir = os.path.join(repos_dir, repo_name.split('/')[1])
             log.info(f'Mining {repo_name}')
             repo_mining(repo_url, repo_name, num, default_branch)
             log.info(f'Filtering {repo_name}')
             filter_commits(repos_commit_csv, conn, repo_dir)
 
-            # if files contained into the list_inf are not identified goes to delete the repo, otherways goes to check
-            # differences and then delete repo.
-            csv_name = str(num) + '-commit-list-' + repo_name.replace('/', '-') + '-filtered.csv'
-            csv_path_check = os.path.join(repos_commit_csv_filtered, csv_name)
-            df_filtered = pd.read_csv(csv_path_check)
-            if df_filtered.empty:
-                log.info(f'Deleting {repo_name}')
-                print(
-                    f'Repo {repo_name}. URL {"https://github.com/" + repo_name}. Empty.'
-                    , file=open(report_path, 'a'))
-                remove_empty_files(repos_commit_csv_filtered)
-            else:
-                log.info(f'Deleting {repo_name}')
-                delete_repo(repo_dir)
-                remove_empty_files(repos_commit_csv_filtered)
+            # remove all repos stored in repo_dir
+            shutil.rmtree(repo_dir)
+
         except Exception as e:
-            print(e)
             print(f'Error --> {repo_name}. URL {"https://github.com/" + repo_name}. Type of error {e}'
-                  , file=open(report_path, 'a'))
+                      , file=open(report_path, 'a'))
+
             continue
 
 
@@ -185,7 +171,8 @@ if __name__ == '__main__':
 
     repos_list = []
     list_inf = ['circle*', 'gitlab*', 'jenkins*', 'semaphore*', 'travis*', 'appveyor*', 'wercker*', 'bamboo*']
-    list_keywords = ['security*', 'vuln*', 'testing*', 'penetration', 'scan*', 'detect', 'secre*', 'pentest*']
+    list_keywords = ['security*', 'vuln*', 'testing*', 'penetration*', 'scan*', 'detect*', 'secre*', 'pentest*', 'cve*',
+                     'clair', 'websecurity', 'devsec*', 'information-security', 'infosec*', 'appsec*']
     csv_file = 'test.csv'
 
     report_path = os.path.join(APP_ROOT, 'report.txt')
@@ -219,4 +206,3 @@ if __name__ == '__main__':
     # Starting process
 
     repo_analysis(csv_file, report_path)
-    remove_empty_files(commit_changes_dir)
