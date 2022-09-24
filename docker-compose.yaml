@@ -1,6 +1,12 @@
 version: "3"
 
 services:
+  db:
+    build: .
+    volumes:
+      - ./commits.db:/usr/src/app/commits.db
+    environment:
+      - SQLITE3_DB=db.sqlite3
   app:
     container_name: ci_cd_analysis
     image: ci_cd_analysis:latest
@@ -8,7 +14,5 @@ services:
     restart: on-failure
     volumes:
       - ./repos_commit_csv/:/usr/src/app/repos_commit_csv/
-      - ./repos_commit_csv_filtered/:/usr/src/app/repos_commit_csv_filtered/
-      - ./commit_changes_dir/:/usr/src/app/commit_changes_dir/
       - ./repos_dir/:/usr/src/app/repos_dir/
 

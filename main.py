@@ -16,7 +16,6 @@ nltk.download('stopwords')
 
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 repos_commit_csv = os.path.join(APP_ROOT, 'repos_commit_csv')
-repos_commit_csv_filtered = os.path.join(APP_ROOT, 'repos_commit_csv_filtered')
 repos_dir = os.path.join(APP_ROOT, 'repos_dir')
 log.basicConfig(level=log.INFO,
                 format='%(asctime)s :: proc_id %(process)s :: %(funcName)s :: %(levelname)s :: %(message)s')
@@ -91,6 +90,7 @@ def repo_mining(repo_url, repo_name, num, branch):
             csv_name = str(num) + '-commit-list-' + repo_name.replace('/', '-') + '.csv'
             csv_location_path = os.path.join(repos_commit_csv, csv_name)
             commits_data.to_csv(csv_location_path, sep=',', encoding='utf-8', index=False)
+
     except Exception as e:
         print(e)
         pass
@@ -115,10 +115,18 @@ def filter_commits(folder, conn, repo_dir):
             df = pd.read_csv(path_csv_file)
 
             for num, row in enumerate(df['modified_file']):
+
+                # check if one of the words contained in the list is in the file's name, and also check if that file
+                # ends with a .yml extension.
+
                 for check in list_inf:
-                    if re.search(check, str(row).lower()):
+                    if re.search(check, str(row).lower()) and '.yml' in str(row):
                         important_elm.append(df.loc[num])
+
             for num, row in enumerate(df['commit_message']):
+
+                # check if one or more words contained in the list are also in the commit's message.
+
                 filtered_sentence = nlp_process(row)
                 for k_check in list_keywords:
                     if re.search(k_check, filtered_sentence):
@@ -128,6 +136,15 @@ def filter_commits(folder, conn, repo_dir):
 
             new_commits_data.to_sql(name='repo_commit', con=conn, if_exists='append', index=False)
             conn.commit()
+
+            # Delete records with the same repo_name and commit_sha to avoid redundancy.
+
+            cursor = conn.cursor()
+            sqlite_select_query = """DELETE FROM repo_commit WHERE id_commit NOT IN (SELECT min(id_commit) FROM 
+                        repo_commit GROUP BY repo_name, commit_sha); """
+
+            cursor.execute(sqlite_select_query)
+            cursor.close()
 
             for elm in github_files:
                 list_inf.remove(elm)
@@ -160,6 +177,12 @@ def repo_analysis(csv_name, report_path):
             # remove all repos stored in repo_dir
             shutil.rmtree(repo_dir)
 
+            # remove all files stored in repos_commit_csv
+
+            for file in os.listdir(repos_commit_csv):
+                os.remove(os.path.join(repos_commit_csv,file))
+                print(f'REMOVED : {file}')
+
         except Exception as e:
             print(f'Error --> {repo_name}. URL {"https://github.com/" + repo_name}. Type of error {e}'
                       , file=open(report_path, 'a'))
@@ -182,9 +205,6 @@ if __name__ == '__main__':
     clean_directory(repos_commit_csv)
     log.info(f'{repos_commit_csv} cleaned...')
 
-    clean_directory(repos_commit_csv_filtered)
-    log.info(f'{repos_commit_csv_filtered} cleaned...')
-
     clean_directory(repos_dir)
     log.info(f'{repos_dir} cleaned...')
 
@@ -193,10 +213,6 @@ if __name__ == '__main__':
 
     if not os.path.exists(repos_commit_csv):
         os.makedirs(repos_commit_csv)
-        log.info('Directory repos_commit_csv created...')
-
-    if not os.path.exists(repos_commit_csv_filtered):
-        os.makedirs(repos_commit_csv_filtered)
         log.info('Directory repos_commit_csv created...')
 
     if not os.path.exists(repos_dir):
