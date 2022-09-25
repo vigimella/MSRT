@@ -2,8 +2,8 @@ import re, sqlite3, stat, os, shutil, spacy, nltk
 
 import pandas as pd
 import logging as log
-import db_settings
 
+from db_settings import settings_db
 from pydriller import RepositoryMining
 from nltk.tokenize import sent_tokenize
 from nltk.corpus import stopwords
@@ -17,9 +17,9 @@ nltk.download('stopwords')
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 repos_commit_csv = os.path.join(APP_ROOT, 'repos_commit_csv')
 repos_dir = os.path.join(APP_ROOT, 'repos_dir')
+db_dir = os.path.join(APP_ROOT, 'db_dir')
 log.basicConfig(level=log.INFO,
                 format='%(asctime)s :: proc_id %(process)s :: %(funcName)s :: %(levelname)s :: %(message)s')
-
 
 def nlp_process(repo_commit):
     # sentence tokenization
@@ -219,6 +219,11 @@ if __name__ == '__main__':
         os.makedirs(repos_dir)
         log.info('Directory repos_commit_csv created...')
 
-    # Starting process
+    if not os.path.exists(db_dir):
+        os.makedirs(db_dir)
+        log.info('Directory db_dir created...')
 
+
+    # Starting process
+    settings_db()
     repo_analysis(csv_file, report_path)
