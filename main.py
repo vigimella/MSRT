@@ -133,7 +133,6 @@ def filter_commits(folder, conn, repo_dir):
                         important_elm.append(df.loc[num])
 
             new_commits_data = pd.DataFrame(important_elm)
-
             new_commits_data.to_sql(name='repo_commit', con=conn, if_exists='append', index=False)
             conn.commit()
 
@@ -163,7 +162,7 @@ def repo_analysis(csv_name, report_path):
         try:
 
             default_branch = df['Default_Branch'][num]
-            conn = sqlite3.connect('commits.db')
+            conn = sqlite3.connect('./db/commits.db')
 
             log.info(f'Started : {repo_name} (Repo n. {int(num) + 1} of {df["Repo_Name"].count()}) ...')
 
