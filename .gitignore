@@ -6,4 +6,4 @@ venv
 .idea
 original.csv
 test.csv
-commits.db
+db

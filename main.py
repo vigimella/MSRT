@@ -17,9 +17,10 @@ nltk.download('stopwords')
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 repos_commit_csv = os.path.join(APP_ROOT, 'repos_commit_csv')
 repos_dir = os.path.join(APP_ROOT, 'repos_dir')
-db_dir = os.path.join(APP_ROOT, 'db_dir')
+db_dir = os.path.join(APP_ROOT, 'db')
 log.basicConfig(level=log.INFO,
                 format='%(asctime)s :: proc_id %(process)s :: %(funcName)s :: %(levelname)s :: %(message)s')
+
 
 def nlp_process(repo_commit):
     # sentence tokenization
@@ -108,29 +109,26 @@ def filter_commits(folder, conn, repo_dir):
 
             if os.path.exists(path_gh_workflow_dir):
                 for file in os.listdir(path_gh_workflow_dir):
-                    list_inf.append(file)
+                    ci_cd_platforms.append(file)
                     github_files.append(file)
 
             path_csv_file = os.path.join(folder, csv)
             df = pd.read_csv(path_csv_file)
 
-            for num, row in enumerate(df['modified_file']):
+            for num in range(df['commit_sha'].count()):
 
-                # check if one of the words contained in the list is in the file's name, and also check if that file
-                # ends with a .yml extension.
+                # commit message elm (row, column)
+                cm_row = df.iloc[num, 8]
+                # modified_file elm (row, column)
+                mf_row = df.iloc[num, 6]
 
-                for check in list_inf:
-                    if re.search(check, str(row).lower()) and '.yml' in str(row):
-                        important_elm.append(df.loc[num])
+                cleaned_msg = nlp_process(cm_row)
 
-            for num, row in enumerate(df['commit_message']):
+                for ci_cd in ci_cd_platforms:
+                    for keyword in keywords:
 
-                # check if one or more words contained in the list are also in the commit's message.
-
-                filtered_sentence = nlp_process(row)
-                for k_check in list_keywords:
-                    if re.search(k_check, filtered_sentence):
-                        important_elm.append(df.loc[num])
+                        if re.search(ci_cd, mf_row.lower()) and '.yml' in mf_row and re.search(keyword, cleaned_msg):
+                            important_elm.append(df.loc[num])
 
             new_commits_data = pd.DataFrame(important_elm)
             new_commits_data.to_sql(name='repo_commit', con=conn, if_exists='append', index=False)
@@ -146,7 +144,7 @@ def filter_commits(folder, conn, repo_dir):
             cursor.close()
 
             for elm in github_files:
-                list_inf.remove(elm)
+                ci_cd_platforms.remove(elm)
 
             important_elm.clear()
 
@@ -179,12 +177,12 @@ def repo_analysis(csv_name, report_path):
             # remove all files stored in repos_commit_csv
 
             for file in os.listdir(repos_commit_csv):
-                os.remove(os.path.join(repos_commit_csv,file))
+                os.remove(os.path.join(repos_commit_csv, file))
                 print(f'REMOVED : {file}')
 
         except Exception as e:
             print(f'Error --> {repo_name}. URL {"https://github.com/" + repo_name}. Type of error {e}'
-                      , file=open(report_path, 'a'))
+                  , file=open(report_path, 'a'))
 
             continue
 
@@ -192,9 +190,9 @@ def repo_analysis(csv_name, report_path):
 if __name__ == '__main__':
 
     repos_list = []
-    list_inf = ['circle*', 'gitlab*', 'jenkins*', 'semaphore*', 'travis*', 'appveyor*', 'wercker*', 'bamboo*']
-    list_keywords = ['security*', 'vuln*', 'testing*', 'penetration*', 'scan*', 'detect*', 'secre*', 'pentest*', 'cve*',
-                     'clair', 'websecurity', 'devsec*', 'information-security', 'infosec*', 'appsec*']
+    ci_cd_platforms = ['circle*', 'gitlab*', 'jenkins*', 'semaphore*', 'travis*', 'appveyor*', 'wercker*', 'bamboo*']
+    keywords = ['', 'security*', 'vuln*', 'testing*', 'penetration*', 'scan*', 'detect*', 'secre*', 'pentest*', 'cve*',
+                'clair', 'websecurity', 'devsec*', 'information-security', 'infosec*', 'appsec*']
     csv_file = 'test.csv'
 
     report_path = os.path.join(APP_ROOT, 'report.txt')
@@ -221,7 +219,6 @@ if __name__ == '__main__':
     if not os.path.exists(db_dir):
         os.makedirs(db_dir)
         log.info('Directory db_dir created...')
-
 
     # Starting process
     settings_db()
