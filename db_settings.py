@@ -1,4 +1,4 @@
-import sqlite3, csv
+import sqlite3, csv, os, glob
 
 
 def settings_db():
@@ -39,7 +39,10 @@ def settings_db():
 
     print('Populating repository table...')
 
-    with open('test.csv', 'r') as fin:
+    csv_file = glob.glob('*.{}'.format('csv'))[0]
+    print(csv_file)
+
+    with open(csv_file, 'r') as fin:
         dr = csv.DictReader(fin)
         to_db = [(i['Repo_Name'], i['Language'], i['Default_Branch'], i['Created_At'], i['Modified_At'], i['Size'],
                   i['Stars'], i['Forks']) for i

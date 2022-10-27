@@ -1,4 +1,4 @@
-import re, sqlite3, stat, os, shutil, spacy, nltk
+import re, sqlite3, stat, os, shutil, spacy, nltk, glob
 
 import pandas as pd
 import logging as log
@@ -9,6 +9,7 @@ from nltk.tokenize import sent_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 from nltk.tokenize import sent_tokenize, word_tokenize
+from concurrent.futures import ThreadPoolExecutor
 
 nlp = spacy.load("en_core_web_sm")
 nltk.download('punkt')  # for tokenization
@@ -193,7 +194,9 @@ if __name__ == '__main__':
     ci_cd_platforms = ['circle*', 'gitlab*', 'jenkins*', 'semaphore*', 'travis*', 'appveyor*', 'wercker*', 'bamboo*']
     keywords = ['', 'security*', 'vuln*', 'testing*', 'penetration*', 'scan*', 'detect*', 'secre*', 'pentest*', 'cve*',
                 'clair', 'websecurity', 'devsec*', 'information-security', 'infosec*', 'appsec*']
-    csv_file = 'test.csv'
+
+    csv_file = glob.glob('*.{}'.format('csv'))[0]
+    N_THREADS = 4
 
     report_path = os.path.join(APP_ROOT, 'report.txt')
 
@@ -222,4 +225,5 @@ if __name__ == '__main__':
 
     # Starting process
     settings_db()
-    repo_analysis(csv_file, report_path)
+    with ThreadPoolExecutor(N_THREADS) as p:
+        p.submit(repo_analysis, csv_file, report_path)
