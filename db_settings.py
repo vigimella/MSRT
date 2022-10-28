@@ -40,7 +40,6 @@ def settings_db():
     print('Populating repository table...')
 
     csv_file = glob.glob('*.{}'.format('csv'))[0]
-    print(csv_file)
 
     with open(csv_file, 'r') as fin:
         dr = csv.DictReader(fin)
