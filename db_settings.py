@@ -2,7 +2,7 @@ import sqlite3, csv, os, glob
 
 
 def settings_db():
-    conn = sqlite3.connect('./db/commits.db')
+    conn = sqlite3.connect('./db/commits.db', check_same_thread=False)
 
     c = conn.cursor()
 

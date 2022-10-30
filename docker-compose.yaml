@@ -4,7 +4,6 @@ services:
   app:
     container_name: ci_cd_analysis
     build: .
-    restart: on-failure
     volumes:
       - ./repos_commit_csv/:/usr/src/app/repos_commit_csv/
       - ./repos_dir/:/usr/src/app/repos_dir/
