@@ -5,10 +5,8 @@ import logging as log
 
 from db_settings import settings_db
 from pydriller import RepositoryMining
-from nltk.tokenize import sent_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
-from nltk.tokenize import sent_tokenize, word_tokenize
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
 
