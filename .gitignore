@@ -4,6 +4,5 @@ repos_commit_csv_filtered
 commit_changes_dir
 venv
 .idea
-original.csv
-test.csv
+*.csv
 db

@@ -74,9 +74,10 @@ def repo_analysis(repo_name, default_branch):
 
     dataf = pd.read_csv(csv_file)
 
-    num = dataf[dataf['Repo_Name'] == repo_name].index[0]
+    num = dataf[dataf['Repo_Name'] == repo_name].index[0] + 1
+    total_repos = dataf["Repo_Name"].count()
 
-    log.info(f'Started : {repo_name} | {str(num + 1)} of {dataf["Repo_Name"].count()}')
+    log.info(f'Started : {repo_name} | {str(num)} of {total_repos} | {((num * 100) / total_repos)}%')
 
     repo_url = 'https://test:test@github.com/' + repo_name
     repo_dir = os.path.join(repos_dir, repo_name.split('/')[1])
