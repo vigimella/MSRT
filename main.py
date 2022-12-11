@@ -1,4 +1,4 @@
-import re, sqlite3, stat, os, shutil, spacy, nltk, glob
+import re, sqlite3, stat, os, shutil, spacy, nltk, glob,csv
 
 import pandas as pd
 import logging as log
@@ -111,35 +111,21 @@ def repo_analysis(repo_name, default_branch):
     try:
 
         important_elm = list()
-        github_files = list()
-
-        path_gh_workflow_dir = os.path.join(repos_dir, repo_dir + '/.github/workflows')
-
-        if os.path.exists(path_gh_workflow_dir):
-            for file in os.listdir(path_gh_workflow_dir):
-                ci_cd_platforms.append(file)
-                github_files.append(file)
 
         csv_name = 'commit-list-' + repo_name.replace('/', '-') + '.csv'
         csv_location_path = os.path.join(repos_commit_csv, csv_name)
 
-        data_frame = pd.read_csv(csv_location_path)
+        csv_file_to_check = csv.reader(open(csv_location_path, 'r', encoding='UTF-8'), delimiter=',')
 
-        for num in range(data_frame['commit_sha'].count()):
-
-            # commit message elm (row, column)
-            cm_row = data_frame.iloc[num, 8]
-            # modified_file elm (row, column)
-            mf_row = data_frame.iloc[num, 6]
-
-            cleaned_msg = nlp_process(cm_row)
-
+        for row in csv_file_to_check:
             for ci_cd in ci_cd_platforms:
                 for keyword in keywords:
-                    if re.search(ci_cd, mf_row.lower()) and '.yml' in mf_row and re.search(keyword, cleaned_msg):
-                        important_elm.append(data_frame.loc[num])
+
+                    if re.search(keyword, row[8].lower()) and '.yml' in row[5].lower() and re.search(ci_cd, row[5].lower()):
+                        important_elm.append(row)
 
         new_commits_data = pd.DataFrame(important_elm)
+        new_commits_data.columns = ['repo_name', 'commit_sha','commit_url', 'commit_date','author', 'modified_file_new_path','modified_file', 'change_type', 'commit_message']
         new_commits_data.to_sql(name='repo_commit', con=conn, if_exists='append', index=False)
         conn.commit()
 
@@ -147,7 +133,7 @@ def repo_analysis(repo_name, default_branch):
 
         cursor = conn.cursor()
         sqlite_select_query = """DELETE FROM repo_commit WHERE id_commit NOT IN (SELECT min(id_commit) FROM 
-                                    repo_commit GROUP BY repo_name, commit_sha); """
+                                    repo_commit GROUP BY commit_sha, modified_file_new_path); """
 
         cursor.execute(sqlite_select_query)
         cursor.close()
@@ -155,20 +141,22 @@ def repo_analysis(repo_name, default_branch):
         pass
     # remove all repos stored in repo_dir
     shutil.rmtree(repo_dir)
+    log.info(f'Removed : {repos_dir}')
 
     # remove all files stored in repos_commit_csv
 
-    for file in os.listdir(repos_commit_csv):
-        os.remove(os.path.join(repos_commit_csv, file))
-        print(f'REMOVED : {file}')
+    # for file in os.listdir(repos_commit_csv):
+    #     os.remove(os.path.join(repos_commit_csv, file))
+    #     print(f'REMOVED : {file}')
 
 
 if __name__ == '__main__':
 
     repos_list = []
-    ci_cd_platforms = ['circle*', 'gitlab*', 'jenkins*', 'semaphore*', 'travis*', 'appveyor*', 'wercker*', 'bamboo*']
-    keywords = ['', 'security*', 'vuln*', 'testing*', 'penetration*', 'scan*', 'detect*', 'secre*', 'pentest*', 'cve*',
-                'clair', 'websecurity', 'devsec*', 'information-security', 'infosec*', 'appsec*']
+    ci_cd_platforms = ['circle*', 'gitlab*', 'jenkins*', 'semaphore*', 'travis*', 'appveyor*', 'wercker*', 'bamboo*',
+                       '.github/workflows/*']
+    keywords = ['information-security', 'security*', 'vuln*', 'testing*', 'penetration*', 'scan*', 'detect*', 'secre*',
+                'pentest*', 'cve*', 'websecurity', 'devsec*', 'infosec*', 'appsec*']
 
     csv_file = glob.glob('*.{}'.format('csv'))[0]
     N_THREADS = cpu_count() - 1
