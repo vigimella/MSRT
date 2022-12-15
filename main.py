@@ -1,18 +1,12 @@
-import re, sqlite3, stat, os, shutil, spacy, nltk, glob,csv
+import re, sqlite3, stat, os, shutil, spacy, glob,csv
 
 import pandas as pd
 import logging as log
 
 from db_settings import settings_db
 from pydriller import RepositoryMining
-from nltk.corpus import stopwords
-from nltk.stem import PorterStemmer
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
-
-nlp = spacy.load("en_core_web_sm")
-nltk.download('punkt')  # for tokenization
-nltk.download('stopwords')
 
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 repos_commit_csv = os.path.join(APP_ROOT, 'repos_commit_csv')
@@ -20,29 +14,6 @@ repos_dir = os.path.join(APP_ROOT, 'repos_dir')
 db_dir = os.path.join(APP_ROOT, 'db')
 log.basicConfig(level=log.INFO,
                 format='%(asctime)s :: proc_id %(process)s :: %(funcName)s :: %(levelname)s :: %(message)s')
-
-
-def nlp_process(repo_commit):
-    # sentence tokenization
-    tokens = nltk.word_tokenize(repo_commit)
-    # punctuation and digits removal
-    tokens = [token.lower() for token in tokens if token.isalpha()]
-    # stopwords
-    stop_words = set(stopwords.words("english"))
-    list_filtered_sent = list()
-    for w in tokens:
-        if w not in stop_words:
-            list_filtered_sent.append(w)
-
-    ps = PorterStemmer()
-    stemmed_words = list()
-    for w in list_filtered_sent:
-        stemmed_words.append(ps.stem(w))
-
-    filtered_sent = ' '.join(stemmed_words)
-
-    return filtered_sent
-
 
 def clean_directory(path):
     if os.name == 'nt':
