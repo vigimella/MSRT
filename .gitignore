@@ -6,3 +6,4 @@ venv
 .idea
 *.csv
 db
+__pycache__

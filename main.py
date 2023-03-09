@@ -1,4 +1,4 @@
-import re, sqlite3, stat, os, shutil, spacy, glob,csv
+import re, sqlite3, stat, os, shutil, glob, csv
 
 import pandas as pd
 import logging as log
@@ -14,6 +14,7 @@ repos_dir = os.path.join(APP_ROOT, 'repos_dir')
 db_dir = os.path.join(APP_ROOT, 'db')
 log.basicConfig(level=log.INFO,
                 format='%(asctime)s :: proc_id %(process)s :: %(funcName)s :: %(levelname)s :: %(message)s')
+
 
 def clean_directory(path):
     if os.name == 'nt':
@@ -48,7 +49,7 @@ def repo_analysis(repo_name, default_branch):
     total_repos = dataf['Repo_Name'].count()
     percentage = ((num * 100) / total_repos)
 
-    log.info(f'Started : {repo_name} | {num} of {total_repos} | Progress : {round(percentage,2)} %')
+    log.info(f'Started : {repo_name} | {num} of {total_repos} | Progress : {round(percentage, 2)} %')
 
     repo_url = 'https://test:test@github.com/' + repo_name
     repo_dir = os.path.join(repos_dir, repo_name.split('/')[1])
@@ -92,11 +93,13 @@ def repo_analysis(repo_name, default_branch):
             for ci_cd in ci_cd_platforms:
                 for keyword in keywords:
 
-                    if re.search(keyword, row[8].lower()) and '.yml' in row[5].lower() and re.search(ci_cd, row[5].lower()):
+                    if re.search(keyword, row[8].lower()) and '.yml' in row[5].lower() and 'modify' in row[7].lower() \
+                            and re.search(ci_cd, row[5].lower()):
                         important_elm.append(row)
 
         new_commits_data = pd.DataFrame(important_elm)
-        new_commits_data.columns = ['repo_name', 'commit_sha','commit_url', 'commit_date','author', 'modified_file_new_path','modified_file', 'change_type', 'commit_message']
+        new_commits_data.columns = ['repo_name', 'commit_sha', 'commit_url', 'commit_date', 'author',
+                                    'modified_file_new_path', 'modified_file', 'change_type', 'commit_message']
         new_commits_data.to_sql(name='repo_commit', con=conn, if_exists='append', index=False)
         conn.commit()
 
